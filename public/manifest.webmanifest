@@ -1,0 +1,19 @@
+{
+  "name": "Spree – Shared Shopping List",
+  "short_name": "Spree",
+  "description": "A real-time shared shopping list for households.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f5fa",
+  "theme_color": "#6b2d83",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/spree-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

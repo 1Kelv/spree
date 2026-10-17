@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+} from 'react'
 import {
   onAuthStateChanged,
   signOut,
   type User,
 } from 'firebase/auth'
-import AliasSetup from './AliasSetup'
-import AuthPage from './AuthPage'
-import HouseholdSetup from './HouseholdSetup'
-import ShoppingList from './ShoppingList'
 import {
   watchAlias,
   watchHousehold,
@@ -19,6 +20,27 @@ import {
   isFirebaseConfigured,
 } from './lib/firebase'
 
+const AuthPage = lazy(() => import('./AuthPage'))
+const HouseholdSetup = lazy(
+  () => import('./HouseholdSetup'),
+)
+const AliasSetup = lazy(() => import('./AliasSetup'))
+const ShoppingList = lazy(
+  () => import('./ShoppingList'),
+)
+
+function LoadingScreen({
+  message,
+}: {
+  message: string
+}) {
+  return (
+    <main className="auth-page">
+      <p>{message}</p>
+    </main>
+  )
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [checking, setChecking] = useState(true)
@@ -26,10 +48,13 @@ export default function App() {
   useEffect(() => {
     if (!auth) return
 
-    return onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser)
-      setChecking(false)
-    })
+    return onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        setUser(currentUser)
+        setChecking(false)
+      },
+    )
   }, [])
 
   if (!isFirebaseConfigured) {
@@ -49,28 +74,45 @@ export default function App() {
 
   if (checking) {
     return (
-      <main className="auth-page">
-        <p>Checking your account…</p>
-      </main>
+      <LoadingScreen message="Checking your account…" />
     )
   }
 
-  if (!user) {
-    return <AuthPage />
-  }
-
-  return <HouseholdGate key={user.uid} user={user} />
+  return (
+    <Suspense
+      fallback={
+        <LoadingScreen message="Opening Spree…" />
+      }
+    >
+      {user ? (
+        <HouseholdGate
+          key={user.uid}
+          user={user}
+        />
+      ) : (
+        <AuthPage />
+      )}
+    </Suspense>
+  )
 }
 
-function HouseholdGate({ user }: { user: User }) {
+function HouseholdGate({
+  user,
+}: {
+  user: User
+}) {
   const [householdId, setHouseholdId] =
-    useState<string | null | undefined>(undefined)
+    useState<string | null | undefined>(
+      undefined,
+    )
 
   const [household, setHousehold] =
     useState<Household | null>(null)
 
   const [alias, setAlias] =
-    useState<string | null | undefined>(undefined)
+    useState<string | null | undefined>(
+      undefined,
+    )
 
   const [error, setError] = useState('')
 
@@ -91,7 +133,10 @@ function HouseholdGate({ user }: { user: User }) {
   }, [user])
 
   useEffect(() => {
-    if (!householdId) return
+    if (!householdId) {
+      setHousehold(null)
+      return
+    }
 
     return watchHousehold(
       householdId,
@@ -110,14 +155,23 @@ function HouseholdGate({ user }: { user: User }) {
     return (
       <main className="auth-page">
         <div className="auth-card">
-          <h1>Couldn’t load your household</h1>
+          <h1>
+            Couldn’t load your household
+          </h1>
 
           <p>{error}</p>
+
+          <p>
+            Check that Firestore is enabled
+            and your security rules are saved.
+          </p>
 
           <button
             className="auth-submit"
             type="button"
-            onClick={() => void handleSignOut()}
+            onClick={() =>
+              void handleSignOut()
+            }
           >
             Sign out
           </button>
@@ -128,13 +182,10 @@ function HouseholdGate({ user }: { user: User }) {
 
   if (
     householdId === undefined ||
-    alias === undefined ||
-    (householdId && !household)
+    alias === undefined
   ) {
     return (
-      <main className="auth-page">
-        <p>Loading your household…</p>
-      </main>
+      <LoadingScreen message="Loading your profile…" />
     )
   }
 
@@ -156,10 +207,16 @@ function HouseholdGate({ user }: { user: User }) {
     )
   }
 
+  if (!household) {
     return (
+      <LoadingScreen message="Loading your household…" />
+    )
+  }
+
+  return (
     <ShoppingList
       user={user}
-      household={household!}
+      household={household}
       alias={alias}
       onSignOut={handleSignOut}
     />

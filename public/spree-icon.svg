@@ -1,0 +1,52 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-labelledby="title description"
+>
+  <title id="title">Spree</title>
+
+  <desc id="description">
+    A white shopping basket on a purple background
+  </desc>
+
+  <rect
+    width="512"
+    height="512"
+    rx="112"
+    fill="#6b2d83"
+  />
+
+  <path
+    d="M150 218h212l-22 142c-3 21-21 36-42 36h-84c-21 0-39-15-42-36l-22-142Z"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="28"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M205 222l51-105 51 105"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M128 218h256"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="28"
+    stroke-linecap="round"
+  />
+
+  <path
+    d="M220 276v65M292 276v65"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="24"
+    stroke-linecap="round"
+  />
+</svg>

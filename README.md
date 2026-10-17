@@ -1,17 +1,45 @@
 # Spree
 
-**Shop together. Forget nothing.**
+Spree is a real-time shared shopping list for households.
 
-This is the Vite + React + TypeScript source for Spree. The current lesson implements email/password account creation, sign-in, sign-out and password reset using Firebase Authentication. The shopping list still contains editable sample data, which resets on refresh. Firestore households and live sync come next.
+Members can add, edit and tick off items together, see who added each item, and use the app from their phone or desktop.
 
-Start with [SETUP.md](SETUP.md) for the exact VS Code and Firebase steps. Open [CODE_WALKTHROUGH.md](CODE_WALKTHROUGH.md) alongside the code to see what each main file does.
+## Live app
 
-## Quick commands
+[https://spree-1343b.web.app](https://spree-1343b.web.app)
+
+## Features
+
+- Email and password authentication
+- Google sign-in
+- Password reset
+- Create a household
+- Join a household using its private code
+- Personal aliases
+- Editable user profiles
+- Live Firestore updates
+- Item names, details, categories and quantities
+- Item attribution showing who added each item
+- Search and category grouping
+- Hide or show collected items
+- Focused Spree Mode
+- Responsive mobile and desktop design
+- Installable progressive web app
+
+## Technology
+
+- React
+- TypeScript
+- Vite
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Hosting
+- Lucide icons
+
+## Local setup
+
+Clone the repository:
 
 ```bash
-npm install
-npm run dev
-npm run build
-```
-
-Node.js 20.19+ or 22.12+ is required by Vite. A current Node.js LTS release is easiest.
+git clone https://github.com/1Kelv/spree.git
+cd spree
