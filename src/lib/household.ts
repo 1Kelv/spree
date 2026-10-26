@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   updateDoc,
   writeBatch,
+  type Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from './firebase'
@@ -37,6 +38,7 @@ export type ShoppingItem = {
   completed: boolean
   createdBy: string
   createdByAlias?: string
+  createdAt: Timestamp | null
 }
 
 export type Household = {
@@ -57,7 +59,9 @@ function database() {
 
 export function watchProfile(
   user: User,
-  onChange: (householdId: string | null) => void,
+  onChange: (
+    householdId: string | null,
+  ) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
   const profileReference = doc(
@@ -72,7 +76,9 @@ export function watchProfile(
       includeMetadataChanges: true,
     },
     (snapshot) => {
-      if (snapshot.metadata.hasPendingWrites) {
+      if (
+        snapshot.metadata.hasPendingWrites
+      ) {
         return
       }
 
@@ -96,7 +102,9 @@ export function watchProfile(
 
 export function watchAlias(
   user: User,
-  onChange: (alias: string | null) => void,
+  onChange: (
+    alias: string | null,
+  ) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
   const profileReference = doc(
@@ -113,10 +121,13 @@ export function watchAlias(
         return
       }
 
-      const alias = snapshot.data().alias
+      const alias =
+        snapshot.data().alias
 
       onChange(
-        typeof alias === 'string' ? alias : null,
+        typeof alias === 'string'
+          ? alias
+          : null,
       )
     },
     onError,
@@ -172,7 +183,8 @@ export function watchHousehold(
 
       onChange({
         id: snapshot.id,
-        name: snapshot.data().name as string,
+        name: snapshot.data()
+          .name as string,
         members: snapshot.data()
           .members as string[],
       })
@@ -183,7 +195,9 @@ export function watchHousehold(
 
 export function watchItems(
   householdId: string,
-  onChange: (items: ShoppingItem[]) => void,
+  onChange: (
+    items: ShoppingItem[],
+  ) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
   const itemsReference = collection(
@@ -196,12 +210,36 @@ export function watchItems(
   return onSnapshot(
     itemsReference,
     (snapshot) => {
-      const items = snapshot.docs.map(
-        (itemSnapshot) => ({
-          id: itemSnapshot.id,
-          ...itemSnapshot.data(),
-        }),
-      ) as ShoppingItem[]
+      const items =
+        snapshot.docs.map(
+          (itemSnapshot) => {
+            const data =
+              itemSnapshot.data()
+
+            return {
+              id: itemSnapshot.id,
+              name:
+                data.name as string,
+              detail:
+                data.detail as string,
+              category:
+                data.category as Category,
+              quantity:
+                data.quantity as number,
+              completed:
+                data.completed as boolean,
+              createdBy:
+                data.createdBy as string,
+              createdByAlias:
+                typeof data.createdByAlias ===
+                'string'
+                  ? data.createdByAlias
+                  : undefined,
+              createdAt:
+                data.createdAt ?? null,
+            }
+          },
+        )
 
       onChange(items)
     },
@@ -227,7 +265,10 @@ export async function createHousehold(
   const store = database()
 
   const householdReference = doc(
-    collection(store, 'households'),
+    collection(
+      store,
+      'households',
+    ),
   )
 
   const profileReference = doc(
@@ -248,7 +289,8 @@ export async function createHousehold(
   batch.set(
     profileReference,
     {
-      householdId: householdReference.id,
+      householdId:
+        householdReference.id,
     },
     {
       merge: true,
@@ -264,7 +306,11 @@ export async function joinHousehold(
 ) {
   const householdId = code.trim()
 
-  if (!/^[A-Za-z0-9]{20}$/.test(householdId)) {
+  if (
+    !/^[A-Za-z0-9]{20}$/.test(
+      householdId,
+    )
+  ) {
     throw new Error(
       'Enter the 20-character household code.',
     )
@@ -278,9 +324,10 @@ export async function joinHousehold(
     householdId,
   )
 
-  const householdSnapshot = await getDoc(
-    householdReference,
-  )
+  const householdSnapshot =
+    await getDoc(
+      householdReference,
+    )
 
   if (!householdSnapshot.exists()) {
     throw new Error(
@@ -366,7 +413,8 @@ export async function addShoppingItem(
     completed: false,
     createdBy: user.uid,
     createdByAlias:
-      trimmedAlias || 'Household member',
+      trimmedAlias ||
+      'Household member',
     createdAt: serverTimestamp(),
   })
 }
@@ -395,10 +443,15 @@ export async function changeShoppingItemQuantity(
 ) {
   const nextQuantity = Math.max(
     1,
-    Math.min(999, item.quantity + amount),
+    Math.min(
+      999,
+      item.quantity + amount,
+    ),
   )
 
-  if (nextQuantity === item.quantity) {
+  if (
+    nextQuantity === item.quantity
+  ) {
     return
   }
 

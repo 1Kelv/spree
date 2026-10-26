@@ -11,7 +11,6 @@ import {
   HeartPulse,
   Home,
   IceCreamBowl,
-  ListFilter,
   Minus,
   MoreHorizontal,
   Package,
@@ -20,6 +19,7 @@ import {
   Search,
   Settings,
   ShoppingBasket,
+  SlidersHorizontal,
   Snowflake,
   Sparkles,
   Trash2,
@@ -51,6 +51,15 @@ type ShoppingListProps = {
   alias: string
   onSignOut: () => Promise<void>
 }
+
+type ListTab = 'to-buy' | 'purchased'
+
+type SortOption =
+  | 'newest'
+  | 'oldest'
+  | 'a-z'
+  | 'z-a'
+  | 'category'
 
 const categories: Category[] = [
   'Fruit & Veg',
@@ -159,6 +168,15 @@ const quickAdds: Array<{
   },
 ]
 
+function createdAtMilliseconds(item: ShoppingItem) {
+  return item.createdAt?.toMillis() ?? 0
+}
+
+function contributorName(item: ShoppingItem) {
+  const name = item.createdByAlias?.trim()
+  return name || 'Household member'
+}
+
 export default function ShoppingList({
   user,
   household,
@@ -183,8 +201,24 @@ export default function ShoppingList({
 
   const [search, setSearch] = useState('')
 
-  const [showCompleted, setShowCompleted] =
-    useState(true)
+  const [activeTab, setActiveTab] =
+    useState<ListTab>('to-buy')
+
+  const [filtersOpen, setFiltersOpen] =
+    useState(false)
+
+  const [
+    contributorFilter,
+    setContributorFilter,
+  ] = useState('all')
+
+  const [
+    categoryFilter,
+    setCategoryFilter,
+  ] = useState<Category | 'all'>('all')
+
+  const [sortBy, setSortBy] =
+    useState<SortOption>('newest')
 
   const [spreeMode, setSpreeMode] =
     useState(false)
@@ -215,30 +249,131 @@ export default function ShoppingList({
     )
   }, [household.id])
 
-  const completedCount = items.filter(
+  const toBuyCount = items.filter(
+    (item) => !item.completed,
+  ).length
+
+  const purchasedCount = items.filter(
     (item) => item.completed,
   ).length
 
   const progress = items.length
     ? Math.round(
-        (completedCount / items.length) * 100,
+        (purchasedCount / items.length) * 100,
       )
     : 0
+
+  const contributors = useMemo(() => {
+    const names = items.map(contributorName)
+
+    return Array.from(new Set(names)).sort(
+      (first, second) =>
+        first.localeCompare(second, 'en-GB', {
+          sensitivity: 'base',
+        }),
+    )
+  }, [items])
+
+  const activeFilterCount =
+    (contributorFilter !== 'all' ? 1 : 0) +
+    (categoryFilter !== 'all' ? 1 : 0) +
+    (sortBy !== 'newest' ? 1 : 0)
 
   const visibleItems = useMemo(() => {
     const query = search.trim().toLowerCase()
 
-    return items.filter((item) => {
+    const filteredItems = items.filter((item) => {
+      const matchesTab =
+        activeTab === 'purchased'
+          ? item.completed
+          : !item.completed
+
+      const contributor =
+        contributorName(item)
+
       const matchesSearch =
+        !query ||
         item.name.toLowerCase().includes(query) ||
-        item.detail.toLowerCase().includes(query)
+        item.detail.toLowerCase().includes(query) ||
+        contributor.toLowerCase().includes(query)
 
-      const matchesCompleted =
-        showCompleted || !item.completed
+      const matchesContributor =
+        contributorFilter === 'all' ||
+        contributor === contributorFilter
 
-      return matchesSearch && matchesCompleted
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        item.category === categoryFilter
+
+      return (
+        matchesTab &&
+        matchesSearch &&
+        matchesContributor &&
+        matchesCategory
+      )
     })
-  }, [items, search, showCompleted])
+
+    return [...filteredItems].sort(
+      (first, second) => {
+        if (sortBy === 'oldest') {
+          return (
+            createdAtMilliseconds(first) -
+            createdAtMilliseconds(second)
+          )
+        }
+
+        if (sortBy === 'a-z') {
+          return first.name.localeCompare(
+            second.name,
+            'en-GB',
+            {
+              sensitivity: 'base',
+            },
+          )
+        }
+
+        if (sortBy === 'z-a') {
+          return second.name.localeCompare(
+            first.name,
+            'en-GB',
+            {
+              sensitivity: 'base',
+            },
+          )
+        }
+
+        if (sortBy === 'category') {
+          const categoryDifference =
+            categories.indexOf(first.category) -
+            categories.indexOf(second.category)
+
+          if (categoryDifference !== 0) {
+            return categoryDifference
+          }
+
+          return first.name.localeCompare(
+            second.name,
+            'en-GB',
+            {
+              sensitivity: 'base',
+            },
+          )
+        }
+
+        return (
+          createdAtMilliseconds(second) -
+          createdAtMilliseconds(first)
+        )
+      },
+    )
+  }, [
+    items,
+    activeTab,
+    search,
+    contributorFilter,
+    categoryFilter,
+    sortBy,
+  ])
 
   const groupedItems = useMemo(
     () =>
@@ -268,6 +403,24 @@ export default function ShoppingList({
     .endsWith('s')
     ? `${alias}'`
     : `${alias}'s`
+
+  const filtersAreRestrictingResults =
+    search.trim().length > 0 ||
+    contributorFilter !== 'all' ||
+    categoryFilter !== 'all'
+
+  const itemCountLabel =
+    filtersAreRestrictingResults
+      ? visibleItems.length === 1
+        ? '1 matching item'
+        : `${visibleItems.length} matching items`
+      : activeTab === 'purchased'
+        ? purchasedCount === 1
+          ? '1 purchased item'
+          : `${purchasedCount} purchased items`
+        : toBuyCount === 1
+          ? '1 item to find'
+          : `${toBuyCount} items to find`
 
   async function addItem(
     name: string,
@@ -301,6 +454,7 @@ export default function ShoppingList({
       setNewDetail('')
       setNewCategory('Food Cupboard')
       setNewQuantity(1)
+      setActiveTab('to-buy')
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -413,10 +567,31 @@ export default function ShoppingList({
     }
   }
 
-  const itemCountLabel =
-    items.length === 1
-      ? '1 item to find'
-      : `${items.length} items to find`
+  function clearFilters() {
+    setContributorFilter('all')
+    setCategoryFilter('all')
+    setSortBy('newest')
+  }
+
+  function toggleSpreeMode() {
+    if (spreeMode) {
+      setSpreeMode(false)
+      return
+    }
+
+    setActiveTab('to-buy')
+    setSpreeMode(true)
+  }
+
+  function enterSpreeMode() {
+    setActiveTab('to-buy')
+    setSpreeMode(true)
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
 
   return (
     <main
@@ -477,6 +652,26 @@ export default function ShoppingList({
 
         <div className="topbar-actions">
           <button
+            className="mobile-household-share"
+            type="button"
+            onClick={() =>
+              void copyHouseholdCode()
+            }
+            aria-label={
+              copied
+                ? 'Household code copied'
+                : `Copy household code for ${household.name}`
+            }
+            title={`Household code: ${household.id}`}
+          >
+            {copied ? (
+              <CheckCircle2 size={18} />
+            ) : (
+              <Clipboard size={18} />
+            )}
+          </button>
+
+          <button
             className="profile-button"
             type="button"
             onClick={() =>
@@ -524,11 +719,7 @@ export default function ShoppingList({
                 : 'mode-button'
             }
             type="button"
-            onClick={() =>
-              setSpreeMode(
-                (active) => !active,
-              )
-            }
+            onClick={toggleSpreeMode}
           >
             {spreeMode ? (
               <X size={18} />
@@ -549,7 +740,7 @@ export default function ShoppingList({
           <div className="progress-copy">
             <div>
               <span className="progress-number">
-                {completedCount}
+                {purchasedCount}
               </span>
 
               <span className="progress-label">
@@ -766,7 +957,8 @@ export default function ShoppingList({
                 <Search size={17} />
 
                 <span className="sr-only">
-                  Search your shopping list
+                  Search by item, details, or
+                  contributor
                 </span>
 
                 <input
@@ -781,23 +973,188 @@ export default function ShoppingList({
               </label>
 
               <button
-                className="filter-button"
+                className={
+                  filtersOpen ||
+                  activeFilterCount > 0
+                    ? 'filter-trigger active'
+                    : 'filter-trigger'
+                }
                 type="button"
                 onClick={() =>
-                  setShowCompleted(
-                    (visible) => !visible,
+                  setFiltersOpen(
+                    (open) => !open,
                   )
                 }
-                aria-pressed={!showCompleted}
+                aria-expanded={filtersOpen}
+                aria-controls="shopping-filters"
               >
-                <ListFilter size={17} />
+                <SlidersHorizontal size={17} />
+                <span>Filters</span>
 
-                {showCompleted
-                  ? 'Hide picked'
-                  : 'Show all'}
+                {activeFilterCount > 0 && (
+                  <small>
+                    {activeFilterCount}
+                  </small>
+                )}
               </button>
             </div>
           </div>
+
+          <div
+            className="list-tabs"
+            role="tablist"
+            aria-label="Shopping list sections"
+          >
+            <button
+              className={
+                activeTab === 'to-buy'
+                  ? 'active'
+                  : ''
+              }
+              type="button"
+              role="tab"
+              aria-selected={
+                activeTab === 'to-buy'
+              }
+              onClick={() =>
+                setActiveTab('to-buy')
+              }
+            >
+              <ShoppingBasket size={17} />
+              <span>To buy</span>
+              <small>{toBuyCount}</small>
+            </button>
+
+            <button
+              className={
+                activeTab === 'purchased'
+                  ? 'active'
+                  : ''
+              }
+              type="button"
+              role="tab"
+              aria-selected={
+                activeTab === 'purchased'
+              }
+              onClick={() =>
+                setActiveTab('purchased')
+              }
+            >
+              <CheckCircle2 size={17} />
+              <span>Purchased</span>
+              <small>{purchasedCount}</small>
+            </button>
+          </div>
+
+          {filtersOpen && (
+            <div
+              className="filter-panel"
+              id="shopping-filters"
+            >
+              <label>
+                Added by
+
+                <select
+                  value={contributorFilter}
+                  onChange={(event) =>
+                    setContributorFilter(
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="all">
+                    Everyone
+                  </option>
+
+                  {contributors.map(
+                    (contributor) => (
+                      <option
+                        key={contributor}
+                        value={contributor}
+                      >
+                        {contributor}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <label>
+                Category
+
+                <select
+                  value={categoryFilter}
+                  onChange={(event) =>
+                    setCategoryFilter(
+                      event.target.value as
+                        | Category
+                        | 'all',
+                    )
+                  }
+                >
+                  <option value="all">
+                    All categories
+                  </option>
+
+                  {categories.map(
+                    (category) => (
+                      <option
+                        key={category}
+                        value={category}
+                      >
+                        {category}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+
+              <label>
+                Arrange by
+
+                <select
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(
+                      event.target
+                        .value as SortOption,
+                    )
+                  }
+                >
+                  <option value="newest">
+                    Recently added
+                  </option>
+
+                  <option value="oldest">
+                    Oldest added
+                  </option>
+
+                  <option value="a-z">
+                    Name: A–Z
+                  </option>
+
+                  <option value="z-a">
+                    Name: Z–A
+                  </option>
+
+                  <option value="category">
+                    Category
+                  </option>
+                </select>
+              </label>
+
+              <button
+                className="clear-filters"
+                type="button"
+                disabled={
+                  activeFilterCount === 0
+                }
+                onClick={clearFilters}
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
 
           <div className="groups">
             {loadingItems && (
@@ -898,14 +1255,12 @@ export default function ShoppingList({
                                   </span>
                                 )}
 
-                                {item.createdByAlias && (
-                                  <small>
-                                    Added by{' '}
-                                    {
-                                      item.createdByAlias
-                                    }
-                                  </small>
-                                )}
+                                <small>
+                                  Added by{' '}
+                                  {contributorName(
+                                    item,
+                                  )}
+                                </small>
                               </button>
 
                               <div
@@ -984,19 +1339,40 @@ export default function ShoppingList({
             {!loadingItems &&
               groupedItems.length === 0 && (
                 <div className="empty-state">
-                  <ShoppingBasket size={30} />
+                  {activeTab === 'purchased' ? (
+                    <CheckCircle2 size={30} />
+                  ) : (
+                    <ShoppingBasket size={30} />
+                  )}
 
                   <h3>
-                    {items.length === 0
-                      ? 'Your list is empty'
-                      : 'Nothing to find here'}
+                    {filtersAreRestrictingResults
+                      ? 'No matching items'
+                      : activeTab === 'purchased'
+                        ? 'Nothing purchased yet'
+                        : 'Your list is empty'}
                   </h3>
 
                   <p>
-                    {items.length === 0
-                      ? 'Add your first shopping item above.'
-                      : 'Try another search or show the items you have picked up.'}
+                    {filtersAreRestrictingResults
+                      ? 'Try another search or clear your filters.'
+                      : activeTab === 'purchased'
+                        ? 'Items appear here after you tick them off.'
+                        : 'Add your first shopping item above.'}
                   </p>
+
+                  {filtersAreRestrictingResults && (
+                    <button
+                      className="empty-clear-button"
+                      type="button"
+                      onClick={() => {
+                        setSearch('')
+                        clearFilters()
+                      }}
+                    >
+                      Clear search and filters
+                    </button>
+                  )}
                 </div>
               )}
           </div>
@@ -1027,17 +1403,46 @@ export default function ShoppingList({
         className="mobile-nav"
         aria-label="Main navigation"
       >
-        <a
-          className="selected"
-          href="#top"
+        <button
+          className={
+            !spreeMode &&
+            activeTab === 'to-buy'
+              ? 'selected'
+              : ''
+          }
+          type="button"
+          onClick={() => {
+            setSpreeMode(false)
+            setActiveTab('to-buy')
+          }}
         >
           <ShoppingBasket size={20} />
-          <span>List</span>
-        </a>
+          <span>To buy</span>
+        </button>
 
         <button
+          className={
+            !spreeMode &&
+            activeTab === 'purchased'
+              ? 'selected'
+              : ''
+          }
           type="button"
-          onClick={() => setSpreeMode(true)}
+          onClick={() => {
+            setSpreeMode(false)
+            setActiveTab('purchased')
+          }}
+        >
+          <CheckCircle2 size={20} />
+          <span>Purchased</span>
+        </button>
+
+        <button
+          className={
+            spreeMode ? 'selected' : ''
+          }
+          type="button"
+          onClick={enterSpreeMode}
         >
           <Sparkles size={20} />
           <span>Spree</span>
